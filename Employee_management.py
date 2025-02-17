@@ -1,108 +1,71 @@
 import mysql.connector
-
+from flask import Flask, request
+ 
+class Employee:
+    unique_ids = set()
+ 
+    def __init__(self, employee_id, name, department):
+        if employee_id in Employee.unique_ids:
+            raise ValueError("Employee ID must be unique")
+        self.employee_id = employee_id
+        self.name = name
+        self.department = department
+        Employee.unique_ids.add(employee_id)
+ 
+    def display_employee(self):
+        return f"ID: {self.employee_id}, Name: {self.name}, Department: {self.department}"
+ 
 def create_connection():
     conn = mysql.connector.connect(
         host="localhost",
         user="root",
-        password="Kruti@22",
+        password="kruti@220",
         database="signifydb"
     )
     return conn
-
-def create_table(cursor):
-    create_table_query = """
+ 
+def create_table():
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS Employee (
         id INT PRIMARY KEY,
         name VARCHAR(30),
-        age INT
-    )
-    """
-    cursor.execute(create_table_query)
-
-def add_employee(cursor, conn):
-    try:
-        emp_id = int(input("Enter employee ID: "))
-        name = input("Enter employee name: ")
-        age = int(input("Enter employee age: "))
-        query = "INSERT INTO Employee (id, name, age) VALUES (%s, %s, %s)"
-        cursor.execute(query, (emp_id, name, age))
-        conn.commit()
-        print("Employee added successfully.")
-    except mysql.connector.Error as err:
-        print("Error:", err)
-    except ValueError:
-        print("Invalid input. Please enter numeric values for ID and age.")
-
-def view_employees(cursor):
-    query = "SELECT * FROM Employee"
-    cursor.execute(query)
-    records = cursor.fetchall()
-    if records:
-        print("\n--- Employee Records ---")
-        for emp in records:
-            print(f"ID: {emp[0]}, Name: {emp[1]}, Age: {emp[2]}")
-    else:
-        print("No employees found.")
-
-def update_employee(cursor, conn):
-    try:
-        emp_id = int(input("Enter employee ID to update: "))
-        new_name = input("Enter new name: ")
-        new_age = int(input("Enter new age: "))
-        query = "UPDATE Employee SET name = %s, age = %s WHERE id = %s"
-        cursor.execute(query, (new_name, new_age, emp_id))
-        if cursor.rowcount == 0:
-            print("Employee not found.")
-        else:
-            conn.commit()
-            print("Employee updated successfully.")
-    except mysql.connector.Error as err:
-        print("Error:", err)
-    except ValueError:
-        print("Invalid input. Please enter numeric values for ID and age.")
-
-def delete_employee(cursor, conn):
-    try:
-        emp_id = int(input("Enter employee ID to delete: "))
-        query = "DELETE FROM Employee WHERE id = %s"
-        cursor.execute(query, (emp_id,))
-        if cursor.rowcount == 0:
-            print("Employee not found.")
-        else:
-            conn.commit()
-            print("Employee deleted successfully.")
-    except mysql.connector.Error as err:
-        print("Error:", err)
-    except ValueError:
-        print("Invalid input. Please enter a numeric value for ID.")
-
-def main():
-    conn = create_connection()
-    cursor = conn.cursor()
-    create_table(cursor)
-    while True:
-        print("\n--- Employee Management System ---")
-        print("1. Add Employee")
-        print("2. View Employees")
-        print("3. Update Employee")
-        print("4. Delete Employee")
-        print("5. Exit")
-        choice = input("Enter your choice: ")
-        if choice == '1':
-            add_employee(cursor, conn)
-        elif choice == '2':
-            view_employees(cursor)
-        elif choice == '3':
-            update_employee(cursor, conn)
-        elif choice == '4':
-            delete_employee(cursor, conn)
-        elif choice == '5':
-            break
-        else:
-            print("Invalid choice. Please try again.")
+        department VARCHAR(30)
+    )""")
+    conn.commit()
     cursor.close()
     conn.close()
-    print("Goodbye!")
-
+ 
+def add_employee_to_db(employee):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO Employee (id, name, department) VALUES (%s, %s, %s)",
+                   (employee.employee_id, employee.name, employee.department))
+    conn.commit()
+    cursor.close()
+    conn.close()
+ 
+app = Flask(__name__)
+create_table()
+ 
+@app.route('/')
+def home():
+    return "Welcome to Employee Management System"
+ 
+@app.route('/add_employee')
+def add_employee():
+    try:
+        emp_id = int(request.args.get('employee_id'))
+        name = request.args.get('name')
+        department = request.args.get('department')
+        employee = Employee(emp_id, name, department)
+        add_employee_to_db(employee)
+        return "Employee added successfully"
+    except ValueError as e:
+        return str(e)
+    except Exception as e:
+        return f"Error: {str(e)}"
+ 
 if __name__ == '__main__':
-    main()
+    app.run(debug=True)
